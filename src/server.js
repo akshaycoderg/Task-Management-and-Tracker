@@ -11,9 +11,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 const jwtSecret = process.env.JWT_SECRET || "dev-only-change-me";
 
+const databaseUrl = process.env.DATABASE_URL;
+const requiresDatabaseSsl = /sslmode=require/i.test(databaseUrl || "");
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+  connectionString: databaseUrl,
+  ssl: requiresDatabaseSsl ? { rejectUnauthorized: false } : false
 });
 
 app.use(cors());
