@@ -240,6 +240,20 @@ app.get("/api/auth/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 
+app.post("/api/admin/cleanup-codex-users", asyncRoute(async (req, res) => {
+  requireFields(req.body, ["adminCode"]);
+
+  if (!canUseAdminSignupCode(req)) {
+    return res.status(403).json({ message: "Admin cleanup code is invalid." });
+  }
+
+  const result = await query(
+    "DELETE FROM users WHERE email LIKE 'codex-check-%@example.com' RETURNING id, email"
+  );
+
+  res.json({ deleted: result.rows });
+}));
+
 app.get("/api/dashboard", requireAuth, asyncRoute(async (req, res) => {
   const params = [];
   let accessWhere = "";
