@@ -22,17 +22,35 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function normalizeDateValue(date) {
+  if (!date) return "";
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    return date.toISOString().slice(0, 10);
+  }
+
+  const value = String(date);
+  const match = value.match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : "";
+}
+
 function formatDate(date) {
-  if (!date) return "No due date";
+  const normalized = normalizeDateValue(date);
+  if (!normalized) return "No due date";
+
+  const parsed = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return "No due date";
+
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" })
-    .format(new Date(`${date}T00:00:00`));
+    .format(parsed);
 }
 
 function isOverdue(task) {
-  if (!task.due_date || task.status === "Done") return false;
+  const normalized = normalizeDateValue(task.due_date);
+  if (!normalized || task.status === "Done") return false;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return new Date(`${task.due_date}T00:00:00`) < today;
+  return new Date(`${normalized}T00:00:00`) < today;
 }
 
 async function api(path, options = {}) {
@@ -593,7 +611,7 @@ function openTaskModal(task = null) {
         </select>
       </label>
       <label>Due date
-        <input name="dueDate" type="date" value="${escapeHtml(task?.due_date || "")}">
+        <input name="dueDate" type="date" value="${escapeHtml(normalizeDateValue(task?.due_date))}">
       </label>
     </div>
   `, async (form) => {
