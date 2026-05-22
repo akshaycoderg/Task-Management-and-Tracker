@@ -45,6 +45,11 @@ function publicUser(user) {
   };
 }
 
+function canUseAdminSignupCode(req) {
+  return Boolean(process.env.ADMIN_SIGNUP_CODE) &&
+    req.body.adminCode === process.env.ADMIN_SIGNUP_CODE;
+}
+
 function requireFields(body, fields) {
   const missing = fields.filter((field) => {
     const value = body[field];
@@ -176,8 +181,12 @@ app.post("/api/auth/signup", asyncRoute(async (req, res) => {
 
   const userCount = await query("SELECT COUNT(*)::int AS count FROM users");
   const wantsAdmin = req.body.role === "Admin";
-  const hasAdminCode = process.env.ADMIN_SIGNUP_CODE &&
-    req.body.adminCode === process.env.ADMIN_SIGNUP_CODE;
+  const hasAdminCode = canUseAdminSignupCode(req);
+
+  if (wantsAdmin && userCount.rows[0].count > 0 && !hasAdminCode) {
+    return res.status(403).json({ message: "Admin signup code is required to create an Admin." });
+  }
+
   const role = userCount.rows[0].count === 0 || (wantsAdmin && hasAdminCode) ? "Admin" : "Member";
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -193,6 +202,19 @@ app.post("/api/auth/signup", asyncRoute(async (req, res) => {
     res.status(201).json({ token: signToken(user), user });
   } catch (error) {
     if (error.code === "23505") {
+      if (wantsAdmin && hasAdminCode) {
+        const result = await query(
+          `UPDATE users
+           SET name = $1, password_hash = $2, role = 'Admin'
+           WHERE email = $3
+           RETURNING id, name, email, role, created_at`,
+          [name, passwordHash, email]
+        );
+
+        const user = result.rows[0];
+        return res.json({ token: signToken(user), user });
+      }
+
       return res.status(409).json({ message: "An account with that email already exists." });
     }
     throw error;
