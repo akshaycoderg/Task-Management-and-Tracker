@@ -50,7 +50,9 @@ async function api(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.message || "Request failed.");
+    const error = new Error(data.message || "Request failed.");
+    error.status = response.status;
+    throw error;
   }
 
   return data;
@@ -203,8 +205,25 @@ async function loadApp(refresh = true) {
     await loadData();
     renderCurrentView();
   } catch (err) {
-    clearSession();
-    renderAuth();
+    if (err.status === 401) {
+      clearSession();
+      renderAuth();
+      return;
+    }
+
+    renderShell(`
+      <header class="topbar">
+        <div>
+          <h1>Something needs attention</h1>
+          <p class="muted">${escapeHtml(err.message)}</p>
+        </div>
+        <button class="btn" id="retryLoad">Retry</button>
+      </header>
+      <section class="panel">
+        <p class="muted">Your session is still kept. Retry after fixing the action that failed.</p>
+      </section>
+    `);
+    document.getElementById("retryLoad").addEventListener("click", () => loadApp(false));
   }
 }
 
