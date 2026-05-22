@@ -266,7 +266,7 @@ app.get("/api/dashboard", requireAuth, asyncRoute(async (req, res) => {
   `, params);
 
   const recentTasks = await query(`
-    SELECT t.*, p.name AS project_name, u.name AS assignee_name
+    SELECT t.*, t.due_date::text AS due_date, p.name AS project_name, u.name AS assignee_name
     FROM tasks t
     JOIN projects p ON p.id = t.project_id
     LEFT JOIN users u ON u.id = t.assignee_id
@@ -475,6 +475,7 @@ app.get("/api/tasks", requireAuth, asyncRoute(async (req, res) => {
   const tasks = await query(`
     SELECT
       t.*,
+      t.due_date::text AS due_date,
       p.name AS project_name,
       assignee.name AS assignee_name,
       creator.name AS creator_name
